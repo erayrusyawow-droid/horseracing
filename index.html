@@ -1439,27 +1439,29 @@ function generateJockeys() {
 // --- MEVCUT createHorse FONKSİYONUNUN BİTTİĞİ YERİN ALTINA BUNU EKLE ---
 
 // --- ÖZEL ELİT MÜZAYEDE ATI ÜRETİCİSİ (FERRARİLER BURADA) ---
+// --- ÖZEL ELİT MÜZAYEDE ATI ÜRETİCİSİ (VİDEO ENTEGRELİ) ---
+// --- BU FONKSİYONU ESKİSİYLE DEĞİŞTİR ---
 function createAuctionMonster() {
     const elitePrefixes = ["Royal", "Imperial", "Grand", "Crown", "Majestic", "Supreme", "Eternal", "Golden"];
     const eliteSuffixes = ["Emperor", "Sultan", "King", "Legend", "Pegasus", "Titan", "Phantom", "Dragon"];
     let name = pick(elitePrefixes) + " " + pick(eliteSuffixes);
 
-    // YENİ SİSTEM: Senin en iyi atına göre güç belirle
-let bestPlayerSprint = myHorses.length > 0 ? Math.max(...myHorses.map(h => h.sprint)) : 180;
+    // Güç Ayarları
+    let bestPlayerSprint = myHorses.length > 0 ? Math.max(...myHorses.map(h => h.sprint)) : 180;
+    let sprint = Math.floor(rand(bestPlayerSprint, bestPlayerSprint * 1.15)); 
+    let stamina = Math.floor(rand(bestPlayerSprint, bestPlayerSprint * 1.15));
+    let maxSprint = sprint + rand(20, 50);
+    let maxStamina = stamina + rand(20, 50);
 
-// Müzayede atı senin en iyi atından %0 ile %15 daha güçlü olabilir
-let sprint = Math.floor(rand(bestPlayerSprint, bestPlayerSprint * 1.15)); 
-let stamina = Math.floor(rand(bestPlayerSprint, bestPlayerSprint * 1.15));
-
-let maxSprint = sprint + rand(20, 50);
-let maxStamina = stamina + rand(20, 50);
-
-    const eliteFilters = [
-        'sepia(1) saturate(5) brightness(1.2) hue-rotate(10deg)', // Altın
-        'invert(1) hue-rotate(180deg)', // Mistik Beyaz
-        'hue-rotate(250deg) saturate(3) brightness(0.7)', // Mor
-        'grayscale(100%) brightness(1.5) contrast(1.2)' // Gümüş
+    // --- İŞTE EKSİK OLAN KISIM BURASIYDI ---
+    const auctionStyles = [
+        { filter: 'sepia(1) saturate(5) brightness(1.2) hue-rotate(10deg)', video: 'at_doru.mp4' },
+        { filter: 'invert(1) hue-rotate(180deg)', video: 'at_kir.mp4' },
+        { filter: 'grayscale(100%) brightness(1.5) contrast(1.2)', video: 'at_kir.mp4' },
+        { filter: 'hue-rotate(250deg) saturate(3) brightness(0.7)', video: 'at_yagiz.mp4' }
     ];
+
+    let selectedStyle = pick(auctionStyles);
 
     return {
         id: Date.now() + Math.random(),
@@ -1471,11 +1473,12 @@ let maxStamina = stamina + rand(20, 50);
         maxSprint: maxSprint,
         maxStamina: maxStamina,
         surface: Math.random() > 0.5 ? "Çim" : "Kum",
-        price: Math.floor((sprint + stamina) * 50000), // Taban Fiyat burada sembolik, fonksiyonda ezilecek
+        price: Math.floor((sprint + stamina) * 50000), 
         isElite: true,
         condition: 100,
         history: [],
-        colorFilter: pick(eliteFilters),
+        colorFilter: selectedStyle.filter,    
+        auctionVideo: selectedStyle.video,    // <-- KRİTİK SATIR BU!
         rating: rand(110, 130), 
         trait: { id: 'hirsli', name: '😡 Hırslı', desc: 'Kazanmak için doğmuş.', type: 'pos' },
         isInjured: false,
@@ -2999,80 +3002,109 @@ window.showHorseCard = function(horseId) {
     }
 
    window.openAuctionModal = function() {
-        if(auctionInterval) clearInterval(auctionInterval);
-        
-        // Önce senin en iyi atının hızını bulalım
-        let myBest = (myHorses.length > 0) ? Math.max(...myHorses.map(at => at.sprint)) : 150;
-        
-        // ŞİMDİ "CANAVAR" ATIMIZI ÜRETELİM
-        let h = createAuctionMonster(); 
-        
-        // Üretilen at hala 200'lükse, burada zorla yükseltiyoruz (Güvenlik kilidi)
-        if(h.sprint < myBest) {
-            h.sprint = Math.floor(myBest * (1.1 + Math.random() * 0.1)); // Senin en iyinden %10-20 daha iyi
-            h.stamina = Math.floor(myBest * (1.1 + Math.random() * 0.1));
-            h.maxSprint = h.sprint + 30;
-            h.maxStamina = h.stamina + 30;
-        }
-
-        // Fiyatı da bu yeni güce göre güncelle
-        h.price = Math.floor((h.sprint + h.stamina) * 75000);
-        
-        auctionData = { horse: h, currentBid: h.price, minBid: h.price, leadingBidder: 'Kimse', timer: 3 };
-        aiBiddersList = shuffle(["Godolphin", "Coolmore", "Juddmonte", "Aga Khan", "Katar Emiri", "Japon Holding"]); 
-
-        // --- YENİ NEON TASARIM HTML ---
-        let htmlContent = `
-            <div class="auction-container">
-                <h1>🏆 ELİT MÜZAYEDE SALONU 🏆</h1>
-                <div id="auctionTimerDisplay" style="text-align:center; color:#fff; font-size:18px; margin-bottom:10px; letter-spacing:2px;">BAŞLIYOR...</div>
-
-                <div class="auction-horse-card">
-                    <img src="resimler/at.gif" class="auction-horse-img" style="filter:${h.colorFilter}">
-                    <div class="auction-horse-info">
-                        <h3>${h.name.toUpperCase()}</h3>
-                        <div style="margin-bottom:10px;">
-                            <span class="stat-pill">⚡ HIZ: ${h.sprint.toFixed(0)}</span>
-                            <span class="stat-pill">🛡️ GÜÇ: ${h.stamina.toFixed(0)}</span>
-                            <span class="stat-pill" style="border-color:#e74c3c; color:#e74c3c;">${h.gender}</span>
-                        </div>
-                        <small style="color:#aaa;">Soy Hattı: ${h.sireName} x ${h.damName}</small>
-                    </div>
-                </div>
-
-                <div class="bid-area">
-                    <div class="bid-info-box">
-                        <span class="bid-label">GÜNCEL TEKLİF</span>
-                        <div id="currentBid" class="bid-value">$${h.price.toLocaleString()}</div>
-                        <div id="leadingBidder" class="bid-leader">---</div>
-                    </div>
-                    <div class="bid-info-box">
-                        <span class="bid-label">SİZİN KASANIZ</span>
-                        <div style="font-size:24px; color:#fff; margin-top:10px;">$${money.toLocaleString()}</div>
-                    </div>
-                </div>
-
-                <div class="bid-controls">
-                    <input type="number" id="playerBidInput" class="bid-input" value="${h.price + 100000}">
-                    <button class="bid-btn" onclick="placePlayerBid()">🔥 TEKLİF VER</button>
-                    <button class="bid-btn" style="background: #333; color:#fff; font-size:14px;" onclick="skipAuction()">PAS GEÇ</button>
-                </div>
-                
-                <div style="margin-top:20px; font-size:12px; color:#aaa;">CANLI AKIŞ:</div>
-                <div id="log">
-                    <div>> Müzayede sistemi başlatıldı...</div>
-                    <div style="color:#f1c40f">> Açılış Fiyatı: $${h.price.toLocaleString()}</div>
-                </div>
-
-                <div id="result" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); text-align:center; padding-top:100px; z-index:10;"></div>
-            </div>
-        `;
-
-        document.getElementById("auctionModal").innerHTML = htmlContent;
-        document.getElementById("auctionModal").style.display = 'flex';
-        
-        startAuction();
+    if(auctionInterval) clearInterval(auctionInterval);
+    
+    // En iyi atı bul
+    let myBest = (myHorses.length > 0) ? Math.max(...myHorses.map(at => at.sprint)) : 150;
+    
+    // 1. ADIM: ATIN ÖZELLİKLERİNİ OLUŞTUR
+    let h = createAuctionMonster(); 
+    
+    // Güç Dengelemesi
+    if(h.sprint < myBest) {
+        h.sprint = Math.floor(myBest * (1.1 + Math.random() * 0.1)); 
+        h.stamina = Math.floor(myBest * (1.1 + Math.random() * 0.1));
+        h.maxSprint = h.sprint + 30;
+        h.maxStamina = h.stamina + 30;
     }
+    h.price = Math.floor((h.sprint + h.stamina) * 75000);
+
+    // --- 2. ADIM: KESİN ÇÖZÜM BURASI ---
+    // Diğer fonksiyona güvenmiyoruz, videoyu BURADA zorla seçiyoruz.
+    const videoListesi = ['at_doru.mp4', 'at_kir.mp4', 'at_yagiz.mp4'];
+    // Rastgele birini seç
+    let sansliVideo = videoListesi[Math.floor(Math.random() * videoListesi.length)];
+    
+    // Atın video özelliğine bunu ata
+    h.auctionVideo = sansliVideo;
+    // -----------------------------------
+    
+    // SÜRE 15 SANİYE
+    auctionData = { horse: h, currentBid: h.price, minBid: h.price, leadingBidder: 'Kimse', timer: 15 };
+    aiBiddersList = shuffle(["Godolphin", "Coolmore", "Juddmonte", "Aga Khan", "Katar Emiri", "Japon Holding"]); 
+
+    // --- HTML ---
+    let htmlContent = `
+        <div class="auction-container">
+            <h1>🏆 ELİT MÜZAYEDE SALONU 🏆</h1>
+            <div id="auctionTimerDisplay" style="text-align:center; color:#f1c40f; font-size:22px; margin-bottom:15px; letter-spacing:2px; font-weight:bold; animation: pulse 1s infinite;">
+                BAŞLIYOR... (15 Sn)
+            </div>
+
+            <div class="auction-horse-card" style="flex-direction: column; text-align: center; background: rgba(0,0,0,0.3);">
+                
+                <video id="auctionVideoElement" 
+                       src="${h.auctionVideo}" 
+                       autoplay loop muted playsinline 
+                       onerror="alert('HALA HATA VAR! Dosya: ' + this.src + ' bulunamadı.')"
+                       style="width: 100%; max-width: 600px; border-radius: 15px; border: 3px solid #f1c40f; box-shadow: 0 0 30px rgba(241, 196, 15, 0.5); background-color: #000;">
+                    Tarayıcınız video etiketini desteklemiyor.
+                </video>
+                
+                <div style="font-size:10px; color:#777; margin-top:5px;">
+                    Oynatılan: <strong>${h.auctionVideo}</strong>
+                </div>
+
+                <div class="auction-horse-info" style="margin-top: 15px; width: 100%;">
+                    <h3 style="font-size: 36px; text-shadow: 0 0 10px #000;">${h.name.toUpperCase()}</h3>
+                    <div style="margin-bottom:10px; display:flex; justify-content:center; gap:10px;">
+                        <span class="stat-pill">⚡ HIZ: ${h.sprint.toFixed(0)}</span>
+                        <span class="stat-pill">🛡️ GÜÇ: ${h.stamina.toFixed(0)}</span>
+                        <span class="stat-pill" style="border-color:#e74c3c; color:#e74c3c;">${h.gender}</span>
+                    </div>
+                    <small style="color:#aaa;">Soy Hattı: ${h.sireName} x ${h.damName}</small>
+                </div>
+            </div>
+
+            <div class="bid-area">
+                <div class="bid-info-box">
+                    <span class="bid-label">GÜNCEL TEKLİF</span>
+                    <div id="currentBid" class="bid-value">$${h.price.toLocaleString()}</div>
+                    <div id="leadingBidder" class="bid-leader">---</div>
+                </div>
+                <div class="bid-info-box">
+                    <span class="bid-label">SİZİN KASANIZ</span>
+                    <div style="font-size:24px; color:#fff; margin-top:10px;">$${money.toLocaleString()}</div>
+                </div>
+            </div>
+
+            <div class="bid-controls">
+                <input type="number" id="playerBidInput" class="bid-input" value="${h.price + 100000}">
+                <button class="bid-btn" onclick="placePlayerBid()">🔥 TEKLİF VER</button>
+                <button class="bid-btn" style="background: #333; color:#fff; font-size:14px;" onclick="skipAuction()">PAS GEÇ</button>
+            </div>
+            
+            <div style="margin-top:20px; font-size:12px; color:#aaa;">CANLI AKIŞ:</div>
+            <div id="log">
+                <div>> Müzayede sistemi başlatıldı...</div>
+                <div style="color:#f1c40f">> Açılış Fiyatı: $${h.price.toLocaleString()}</div>
+            </div>
+
+            <div id="result" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); text-align:center; padding-top:100px; z-index:100;"></div>
+        </div>
+    `;
+
+    document.getElementById("auctionModal").innerHTML = htmlContent;
+    document.getElementById("auctionModal").style.display = 'flex';
+    
+    // Otomatik oynatmayı tetikle
+    setTimeout(() => {
+        let v = document.getElementById('auctionVideoElement');
+        if(v) v.play().catch(e => console.log(e));
+    }, 500);
+
+    startAuction();
+}
 
     window.closeAuctionModal = function() {
         clearInterval(auctionInterval);
